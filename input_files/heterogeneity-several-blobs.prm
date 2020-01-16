@@ -1,3 +1,4 @@
+set Additional shared libraries            = ./plugins/libchemical_heterogeneity.so
 
 # At the top, we define the number of space dimensions we would like to
 # work in:
@@ -8,7 +9,7 @@ set Dimension                              = 2
 # also designate an output directory.
 set Use years in output instead of seconds = true
 set End time                               = 1e8
-set Output directory                       = output
+set Output directory                       = output-3
 
 # Then there are variables that describe how the pressure should
 # be normalized. Here, we choose a zero average pressure
@@ -111,12 +112,13 @@ subsection Compositional fields
 end
 
 subsection Initial composition model
-  set Model name = function
+  set Model name = chemical heterogeneity
 
-  subsection Function
+  subsection Chemical Heterogeneity
     set Variable names      = x,z
-    set Function constants  = r=20000, xo=200000, zo=200000
-    set Function expression = if(sqrt((x-xo)*(x-xo)+(z-zo)*(z-zo))<r, 1, 0)
+    set Function expression = if (z<250000,1,0)
+    set Minimum blob radius = 15000
+    set Maximum blob radius = 20000
   end
 end
 
