@@ -124,7 +124,11 @@ end
 
 subsection Boundary composition model
   set Fixed composition boundary indicators = bottom
-  set Model name = initial composition
+  set Model name = chemical heterogeneity
+  
+  subsection Chemical Heterogeneity
+    set Blob spacing = 15000
+  end
 end
 
 
@@ -141,7 +145,7 @@ subsection Material model
     set Compressibility               = 0
 
     set Density differential for compositional field 1 = 200
-    set Phase transition density jumps                 = 0, 100
+    set Phase transition density jumps                 = 0, 130
     set Corresponding phase for density jump           = 1, 0
     set Phase transition depths                        = 300000
     set Phase transition widths                        = 0
@@ -167,11 +171,15 @@ end
 subsection Mesh refinement
   set Initial global refinement                = 3
   set Initial adaptive refinement              = 4
-  set Strategy                                 = composition
+  set Strategy                                 = composition, boundary
   set Refinement fraction                      = 0.9
   set Coarsening fraction                      = 0.05
   set Time steps between mesh refinement       = 1
   set Minimum refinement level                 = 3
+  
+  subsection Boundary
+    set Boundary refinement indicators = bottom
+  end
 end
 
 
@@ -198,6 +206,6 @@ subsection Postprocess
     set List of particle properties = initial composition
     set Allow cells without particles = true
     set Minimum particles per cell = 10
-    set Load balancing strategy = add particles
+    set Load balancing strategy = remove and add particles
   end
 end
