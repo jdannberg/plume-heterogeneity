@@ -84,6 +84,7 @@ namespace aspect
         unsigned int n_blobs;
         double minimum_blob_radius;
         double maximum_blob_radius;
+        double plume_radius;
     };
 
   }
@@ -154,6 +155,7 @@ namespace aspect
         double minimum_blob_radius;
         double maximum_blob_radius;
         double average_velocity;
+        double plume_radius;
     };
   }
 }
@@ -187,8 +189,8 @@ namespace aspect
         {
     	  do
     	  {
-            for (unsigned int d=0; d<dim; ++d)
-              blob_center[d] = (double)(std::rand() % int(extents[d]));
+            blob_center[0] = (double)(std::rand() % int(plume_radius));
+            blob_center[1] = (double)(std::rand() % int(extents[1]));
     	  } while(!geometry->point_is_in_domain(blob_center) || function->value(blob_center,n_comp) == 0.0);
 
           blob_radius = minimum_blob_radius + std::rand() % int(maximum_blob_radius - minimum_blob_radius);
@@ -238,6 +240,10 @@ namespace aspect
           prm.declare_entry ("Maximum blob radius", "25000",
                              Patterns::Double (0),
                              "Maximum radius of spherical blobs with a different composition. Units: $\\si{m}$.");
+          prm.declare_entry ("Plume radius", "400000",
+                             Patterns::Double (0),
+                             "Radius of the plume, i.e. the part of the model where the blobs should be present. "
+                             "Units: $\\si{m}$.");
         }
         prm.leave_subsection();
       }
@@ -257,12 +263,13 @@ namespace aspect
           n_blobs             = prm.get_double ("Number of blobs");
           minimum_blob_radius = prm.get_double ("Minimum blob radius");
           maximum_blob_radius = prm.get_double ("Maximum blob radius");
+          plume_radius        = prm.get_double ("Plume radius");
         }
 
         try
           {
             function
-              = std_cxx14::make_unique<Functions::ParsedFunction<dim>>(this->n_compositional_fields());
+              = std::make_unique<Functions::ParsedFunction<dim>>(this->n_compositional_fields());
             function->parse_parameters (prm);
           }
         catch (...)
@@ -290,10 +297,13 @@ namespace aspect
     template <int dim>
     double
 	ChemicalHeterogeneity<dim>::
-    boundary_composition (const types::boundary_id /*boundary_indicator*/,
+    boundary_composition (const types::boundary_id boundary_indicator,
                           const Point<dim> &position,
                           const unsigned int /*compositional_field*/) const
     {
+      if (boundary_indicator == this->get_geometry_model().translate_symbolic_boundary_name_to_id("top"))
+        return 0.0;
+
       // use a fixed number as seed for random generator
       // this is important if we run the code on more than 1 processor
       std::srand(1);
@@ -331,11 +341,10 @@ namespace aspect
       // use a fixed number as seed for random generator
       // this is important if we run the code on more than 1 processor
       std::srand(1);
-      const Point<dim> extents = geometry->get_extents();
 
       for (unsigned int n=0; n<n_blobs; ++n)
         {
-          blob_centers[n](0) = (double)(std::rand() % int(extents[0]));
+          blob_centers[n](0) = (double)(std::rand() % int(plume_radius));
           blob_centers[n](1) = (double)(std::rand() % int(average_velocity * end_time));
           blob_radii[n] = minimum_blob_radius + std::rand() % int(maximum_blob_radius - minimum_blob_radius);
         }
@@ -384,6 +393,7 @@ namespace aspect
         {
           minimum_blob_radius = prm.get_double ("Minimum blob radius");
           maximum_blob_radius = prm.get_double ("Maximum blob radius");
+          plume_radius        = prm.get_double ("Plume radius");
         }
         prm.leave_subsection();
       }

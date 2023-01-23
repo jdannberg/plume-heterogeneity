@@ -1,0 +1,249 @@
+set Additional shared libraries            = ./plugins/libchemical_heterogeneity.so
+
+# At the top, we define the number of space dimensions we would like to
+# work in:
+set Dimension                              = 2
+
+# There are several global variables that have to do with what
+# time system we want to work in and what the end time is. We
+# also designate an output directory.
+set Use years in output instead of seconds = true
+set End time                               = 1e8
+set Output directory                       = plume_dynamic
+
+subsection Checkpointing
+  set Steps between checkpoint = 10
+  set Time between checkpoint = 1200
+end 
+
+set Resume computation = false
+
+# Then there are variables that describe how the pressure should
+# be normalized. Here, we choose a zero average pressure
+# at the surface of the domain (for the current geometry, the
+# surface is defined as the top boundary).
+set Pressure normalization                 = surface
+set Surface pressure                       = 0
+set Adiabatic surface temperature          = 1600
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Stokes solver type = block GMG
+    set Number of cheap Stokes solver steps = 2000
+  end
+end
+
+# Then come a number of sections that deal with the setup
+# of the problem to solve. The first one deals with the
+# geometry of the domain within which we want to solve.
+# The sections that follow all have the same basic setup
+# where we select the name of a particular model (here,
+# the box geometry) and then, in a further subsection,
+# set the parameters that are specific to this particular
+# model.
+subsection Geometry model
+  set Model name = box
+  subsection Box
+    set X extent = 4000e3
+    set Y extent = 2400e3
+    set X repetitions = 10
+    set Y repetitions = 6
+  end
+end
+
+
+# The next section deals with the initial conditions for the
+# temperature (there are no initial conditions for the
+# velocity variable since the velocity is assumed to always
+# be in a static equilibrium with the temperature field).
+# There are a number of models with the 'function' model
+# a generic one that allows us to enter the actual initial
+# conditions in the form of a formula that can contain
+# constants. We choose a linear temperature profile that
+# matches the boundary conditions defined below plus
+# a small perturbation:
+subsection Initial temperature model
+  set Model name = function
+
+  subsection Function
+    set Variable names      = x,y
+    set Function expression = 1500 + 250 * 0.5 * (1-tanh((x-450000)/40000))
+  end
+end
+
+
+# Then follows a section that describes the boundary conditions
+# for the temperature. The model we choose is called 'box' and
+# allows to set a constant temperature on each of the four sides
+# of the box geometry. In our case, we choose something that is
+# heated from below and cooled from above, whereas all other
+# parts of the boundary are insulated (i.e., no heat flux through
+# these boundaries; this is also often used to specify symmetry
+# boundaries).
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = bottom
+
+  set Model name = initial temperature
+end
+
+
+# The next parameters then describe on which parts of the
+# boundary we prescribe a zero or nonzero velocity and
+# on which parts the flow is allowed to be tangential.
+# Here, all four sides of the box allow tangential
+# unrestricted flow but with a zero normal component:
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = left 
+  set Zero velocity boundary indicators = right
+  set Prescribed velocity boundary indicators = top x: function, bottom x: function
+
+  subsection Function
+    set Variable names      = x,z
+    set Function expression = 0; 0
+  end
+end
+
+subsection Boundary traction model
+  set Prescribed traction boundary indicators = top y: initial lithostatic pressure, bottom y: initial lithostatic pressure
+
+  subsection Initial lithostatic pressure
+    set Representative point = 4000e3, 0
+  end
+end
+
+
+
+# The following two sections describe first the
+# direction (vertical) and magnitude of gravity and the
+# material model (i.e., density, viscosity, etc).
+subsection Gravity model
+  set Model name = vertical
+  subsection Vertical
+    set Magnitude = 10.0
+  end
+end
+
+
+subsection Compositional fields
+  set Number of fields = 1
+  set Names of fields  = basalt
+  set Compositional field methods = particles
+end
+
+subsection Initial composition model
+  set Model name = chemical heterogeneity
+
+  subsection Chemical Heterogeneity
+    set Variable names      = x,z
+    set Function expression = 1 
+    set Minimum blob radius = 15000
+    set Maximum blob radius = 20000
+    set Number of blobs = 220 
+    set Plume radius = 400000
+  end
+end
+
+subsection Boundary composition model
+  set Fixed composition boundary indicators = bottom, top
+  set Model name = chemical heterogeneity
+  subsection Chemical Heterogeneity 
+    set Blob spacing = 12000
+    set Average velocity = 0.25
+  end
+end
+
+
+subsection Material model
+  set Model name = latent heat
+  set Material averaging = project to Q1 only viscosity
+
+  subsection Latent heat
+    set Composition viscosity prefactor = 100.0
+    set Minimum viscosity             = 1e17
+    set Viscosity                     = 5e21
+    set Reference density             = 3291.5
+    set Thermal conductivity          = 4.86
+    set Thermal expansion coefficient = 2.5e-5
+    set Reference specific heat       = 1000
+    set Reference temperature         = 1600
+    set Compressibility               = 0
+    set Thermal viscosity exponent    = 50.0
+
+    set Density differential for compositional field 1 = 140
+    set Phase transition density jumps                 = 70,110 
+    set Corresponding phase for density jump           = 1,0
+    set Phase transition depths                        = 190000,300000
+    set Phase transition widths                        = 0
+    set Phase transition temperatures                  = 1600
+    set Phase transition Clapeyron slopes              = 0
+    set Viscosity prefactors                           = 1,1,1
+  end
+end
+
+
+# We also have to specify that we want to use the Boussinesq
+# approximation (assuming the density in the temperature
+# equation to be constant, and incompressibility).
+subsection Formulation
+  set Formulation = Boussinesq approximation
+end
+
+
+# The following section deals with the discretization of
+# this problem, namely the kind of mesh we want to compute
+# on. 
+subsection Mesh refinement
+  set Initial global refinement                = 3
+  set Initial adaptive refinement              = 4
+  set Strategy                                 = boundary, minimum refinement function, composition
+  set Refinement fraction                      = 0.99
+  set Coarsening fraction                      = 0.001
+  set Time steps between mesh refinement       = 1
+  
+  subsection Boundary
+    set Boundary refinement indicators = bottom
+  end
+  
+  subsection Minimum refinement function
+    set Coordinate system = cartesian
+    set Function expression = if (x>600000, 2, 3)
+  end
+end
+
+
+# The final part is to specify what ASPECT should do with the
+# solution once computed at the end of every time step. The
+# process of evaluating the solution is called `postprocessing'
+# and we choose to compute velocity and temperature statistics,
+# statistics about the heat flux through the boundaries of the
+# domain, and to generate graphical output files for later
+# visualization. These output files are created every time
+# a time step crosses time points separated by 1e7 years.
+subsection Postprocess
+  set List of postprocessors = velocity statistics, composition statistics, visualization, particles, depth average
+  subsection Depth average
+    set Time between graphical output = 1e4
+    set Number of zones = 1 #4
+    set Depth boundaries of zones = 0, 1200e3 # 50000, 150000, 250000, 350000, 450000
+    set List of output variables = temperature,composition,adiabatic temperature,adiabatic pressure,adiabatic density,adiabatic density derivative,velocity magnitude,sinking velocity,viscosity,vertical heat flux, vertical mass flux, composition mass
+
+  end 
+  subsection Visualization
+    set Time between graphical output = 5e4 
+    set Output format                 = vtu
+    set List of output variables      = material properties
+  end
+
+  subsection Particles
+    set Number of particles = 150000
+    set Time between data output = 1e5
+    set Data output format = vtu
+    set List of particle properties = initial composition
+    set Allow cells without particles = true
+    set Minimum particles per cell = 25
+    set Maximum particles per cell = 400
+    set Load balancing strategy = remove and add particles
+  end
+end
+
+
